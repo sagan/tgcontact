@@ -38,6 +38,44 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
     return env.MEDIA_GROUP_DO.get(id);
   };
 
+  // Helper: Send Captcha Challenge
+  const sendCaptchaChallenge = async (userId: number, chatId: number): Promise<boolean> => {
+    const sessionDO = getSessionDO(userId);
+    const statusRes = await sessionDO.fetch(new Request("https://do/status"));
+    const status = (await statusRes.json()) as { isHuman: boolean; isMuted: boolean };
+
+    if (status.isMuted) {
+      await bot.api.sendMessage(
+        chatId,
+        "You are temporarily muted due to multiple failed verification attempts. Please wait 2 minutes.",
+      );
+      return false;
+    }
+
+    if (!status.isHuman) {
+      const captcha = getRandomCaptcha(requestOrigin, userId);
+      const promptMsg = await bot.api.sendPhoto(chatId, captcha.imageUrl, {
+        caption: `Please solve the captcha to contact admin:\nSelect the matching text from the image below:`,
+        reply_markup: captcha.keyboard,
+      });
+
+      await sessionDO.fetch(
+        new Request("https://do/set-captcha", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code: captcha.code,
+            chat_id: chatId,
+            message_id: promptMsg.message_id,
+          }),
+        }),
+      );
+      return true;
+    }
+
+    return false;
+  };
+
   // Command: /start
   bot.command("start", async (ctx) => {
     const user = ctx.from;
@@ -104,6 +142,12 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
       await ctx.reply(`${mention}:\n\n${settings.TGC_WELCOME_MESSAGE}`, {
         parse_mode: "HTML",
       });
+
+      // Send captcha challenge immediately on /start if enabled and user not verified
+      const userRecord = await db.getUser(user.id);
+      if (settings.TGC_DISABLE_CAPTCHA !== 1 && !userRecord?.is_verified) {
+        await sendCaptchaChallenge(user.id, ctx.chat.id);
+      }
     }
   });
 
@@ -304,35 +348,13 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
 
     // 1. Captcha Check
     if (settings.TGC_DISABLE_CAPTCHA !== 1 && !userRecord?.is_verified) {
+      const sent = await sendCaptchaChallenge(user.id, ctx.chat.id);
+      if (sent) return;
+
       const sessionDO = getSessionDO(user.id);
       const statusRes = await sessionDO.fetch(new Request("https://do/status"));
       const status = (await statusRes.json()) as { isHuman: boolean; isMuted: boolean };
-
-      if (status.isMuted) {
-        await ctx.reply(
-          "You are temporarily muted due to multiple failed verification attempts. Please wait 2 minutes.",
-        );
-        return;
-      }
-
-      if (!status.isHuman) {
-        const captcha = getRandomCaptcha(requestOrigin, user.id);
-        const promptMsg = await ctx.replyWithPhoto(captcha.imageUrl, {
-          caption: `Please solve the captcha to contact admin:\nSelect the matching text from the image below:`,
-          reply_markup: captcha.keyboard,
-        });
-
-        await sessionDO.fetch(
-          new Request("https://do/set-captcha", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code: captcha.code,
-              chat_id: ctx.chat.id,
-              message_id: promptMsg.message_id,
-            }),
-          }),
-        );
+      if (!status.isHuman || status.isMuted) {
         return;
       }
     }
