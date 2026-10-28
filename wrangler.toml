@@ -1,0 +1,39 @@
+name = "tgcontact"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+keep_vars = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/health", "/webhook"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tgcontact"
+#database_id = "00000000-0000-0000-0000-000000000000"
+
+[durable_objects]
+bindings = [
+  { name = "MEDIA_GROUP_DO", class_name = "MediaGroupDO" },
+  { name = "SESSION_DO", class_name = "SessionDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["MediaGroupDO", "SessionDO"]
+
+[vars]
+#APP_NAME = "tgcontact"
+#BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+#ADMIN_GROUP_ID = "-1000000000000"
+#ADMIN_USER_IDS = "123456789"
+#WELCOME_MESSAGE = "Hello! Thanks for contacting customer support. An agent will be with you shortly."
+#DELETE_TOPIC_AS_FOREVER_BAN = "FALSE"
+#DELETE_USER_MESSAGE_ON_CLEAR_CMD = "TRUE"
+#DISABLE_CAPTCHA = "FALSE"
+#MESSAGE_INTERVAL = "5"
+#ADMIN_WEB_USERNAME = "admin"
+#ADMIN_WEB_PASSWORD = "admin_password_change_me"
+#JWT_SECRET = "super_secret_jwt_key_please_change_in_production"

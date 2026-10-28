@@ -1,0 +1,24 @@
+{
+  "name": "tgcontact",
+  "version": "1.0.0",
+  "description": "Telegram Interactive Customer Support Bot on Cloudflare Workers + D1 + Durable Objects",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "build:frontend": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "build": "npm run build:frontend",
+    "db:init": "wrangler d1 execute tgcontact --local --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute tgcontact --remote --file=./schema.sql"
+  },
+  "dependencies": {
+    "grammy": "^1.35.0",
+    "hono": "^4.7.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261028.1",
+    "prettier": "^3.9.10",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.154.0"
+  }
+}
