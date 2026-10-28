@@ -1,19 +1,130 @@
 import { Env, UserRecord, ForumStatusRecord, MessageMapRecord, BotSettings } from "../types";
 
+export const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE NOT NULL,
+    first_name TEXT,
+    last_name TEXT,
+    username TEXT,
+    is_premium INTEGER DEFAULT 0,
+    message_thread_id INTEGER DEFAULT 0,
+    is_banned INTEGER DEFAULT 0,
+    is_verified INTEGER DEFAULT 0,
+    last_message_at INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_thread_id ON users(message_thread_id);
+
+CREATE TABLE IF NOT EXISTS forum_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    message_thread_id INTEGER UNIQUE NOT NULL,
+    status TEXT DEFAULT 'opened',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_forum_thread_id ON forum_status(message_thread_id);
+
+CREATE TABLE IF NOT EXISTS message_map (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_chat_message_id INTEGER NOT NULL,
+    group_chat_message_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_msg_map_user_msg ON message_map(user_chat_message_id);
+CREATE INDEX IF NOT EXISTS idx_msg_map_group_msg ON message_map(group_chat_message_id);
+CREATE INDEX IF NOT EXISTS idx_msg_map_user_id ON message_map(user_id);
+
+CREATE TABLE IF NOT EXISTS broadcast_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_admin_id INTEGER,
+    source_message_id INTEGER,
+    total_targets INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    fail_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'completed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS bot_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO bot_settings (key, value) VALUES
+    ('TGC_WELCOME_MESSAGE', 'Hello! Thanks for reaching out. An agent will respond to you shortly.'),
+    ('TGC_DISABLE_CAPTCHA', '0'),
+    ('TGC_MESSAGE_INTERVAL', '5'),
+    ('TGC_DELETE_TOPIC_AS_FOREVER_BAN', '0'),
+    ('TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD', '1');
+`;
+
+let schemaInitialized = false;
+
+export async function ensureSchema(db?: D1Database): Promise<void> {
+  if (schemaInitialized || !db) return;
+  try {
+    await db.exec(SCHEMA_SQL);
+    schemaInitialized = true;
+  } catch (err) {
+    console.warn("db.exec batch schema init warning, retrying individual statements:", err);
+    try {
+      const statements = SCHEMA_SQL.split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const stmt of statements) {
+        try {
+          await db.prepare(stmt).run();
+        } catch {
+          // Ignore individual statement duplicate errors
+        }
+      }
+      schemaInitialized = true;
+    } catch (fallbackErr) {
+      console.error("Failed to auto-initialize D1 schema:", fallbackErr);
+    }
+  }
+}
+
 export class Database {
-  constructor(private db: D1Database) {}
+  constructor(private db?: D1Database) {}
+
+  private async ensureInitialized(): Promise<void> {
+    if (!schemaInitialized && this.db) {
+      await ensureSchema(this.db);
+    }
+  }
 
   async getUser(userId: number): Promise<UserRecord | null> {
-    const res = await this.db.prepare("SELECT * FROM users WHERE user_id = ?").bind(userId).first<UserRecord>();
-    return res;
+    if (!this.db) return null;
+    await this.ensureInitialized();
+    try {
+      const res = await this.db.prepare("SELECT * FROM users WHERE user_id = ?").bind(userId).first<UserRecord>();
+      return res;
+    } catch {
+      return null;
+    }
   }
 
   async getUserByThreadId(threadId: number): Promise<UserRecord | null> {
-    const res = await this.db
-      .prepare("SELECT * FROM users WHERE message_thread_id = ?")
-      .bind(threadId)
-      .first<UserRecord>();
-    return res;
+    if (!this.db) return null;
+    await this.ensureInitialized();
+    try {
+      const res = await this.db
+        .prepare("SELECT * FROM users WHERE message_thread_id = ?")
+        .bind(threadId)
+        .first<UserRecord>();
+      return res;
+    } catch {
+      return null;
+    }
   }
 
   async upsertUser(user: {
@@ -23,53 +134,83 @@ export class Database {
     username?: string | null;
     is_premium?: boolean;
   }): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT INTO users (user_id, first_name, last_name, username, is_premium, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
-         ON CONFLICT(user_id) DO UPDATE SET
-           first_name = excluded.first_name,
-           last_name = excluded.last_name,
-           username = excluded.username,
-           is_premium = excluded.is_premium,
-           updated_at = CURRENT_TIMESTAMP`,
-      )
-      .bind(
-        user.user_id,
-        user.first_name || null,
-        user.last_name || null,
-        user.username || null,
-        user.is_premium ? 1 : 0,
-      )
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO users (user_id, first_name, last_name, username, is_premium, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP)
+           ON CONFLICT(user_id) DO UPDATE SET
+             first_name = excluded.first_name,
+             last_name = excluded.last_name,
+             username = excluded.username,
+             is_premium = excluded.is_premium,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(
+          user.user_id,
+          user.first_name || null,
+          user.last_name || null,
+          user.username || null,
+          user.is_premium ? 1 : 0,
+        )
+        .run();
+    } catch (err) {
+      console.error("Failed to upsert user:", err);
+    }
   }
 
   async updateUserThreadId(userId: number, threadId: number): Promise<void> {
-    await this.db
-      .prepare("UPDATE users SET message_thread_id = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
-      .bind(threadId, userId)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare("UPDATE users SET message_thread_id = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+        .bind(threadId, userId)
+        .run();
+    } catch (err) {
+      console.error("Failed to update user thread ID:", err);
+    }
   }
 
   async setUserBanned(userId: number, isBanned: boolean): Promise<void> {
-    await this.db
-      .prepare("UPDATE users SET is_banned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
-      .bind(isBanned ? 1 : 0, userId)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare("UPDATE users SET is_banned = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+        .bind(isBanned ? 1 : 0, userId)
+        .run();
+    } catch (err) {
+      console.error("Failed to set user banned status:", err);
+    }
   }
 
   async setUserVerified(userId: number, isVerified: boolean): Promise<void> {
-    await this.db
-      .prepare("UPDATE users SET is_verified = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
-      .bind(isVerified ? 1 : 0, userId)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare("UPDATE users SET is_verified = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+        .bind(isVerified ? 1 : 0, userId)
+        .run();
+    } catch (err) {
+      console.error("Failed to set user verified status:", err);
+    }
   }
 
   async updateUserLastMessageTime(userId: number, timestampSec: number): Promise<void> {
-    await this.db
-      .prepare("UPDATE users SET last_message_at = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
-      .bind(timestampSec, userId)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare("UPDATE users SET last_message_at = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?")
+        .bind(timestampSec, userId)
+        .run();
+    } catch (err) {
+      console.error("Failed to update user last message time:", err);
+    }
   }
 
   async listUsers(options?: {
@@ -77,6 +218,8 @@ export class Database {
     limit?: number;
     offset?: number;
   }): Promise<{ users: UserRecord[]; total: number }> {
+    if (!this.db) return { users: [], total: 0 };
+    await this.ensureInitialized();
     const limit = options?.limit || 20;
     const offset = options?.offset || 0;
     const search = options?.search ? `%${options.search.trim()}%` : null;
@@ -84,140 +227,229 @@ export class Database {
     let total = 0;
     let users: UserRecord[] = [];
 
-    if (search) {
-      const countRes = await this.db
-        .prepare(
-          `SELECT COUNT(*) as count FROM users 
-           WHERE user_id LIKE ? OR first_name LIKE ? OR username LIKE ?`,
-        )
-        .bind(search, search, search)
-        .first<{ count: number }>();
-      total = countRes?.count || 0;
+    try {
+      if (search) {
+        const countRes = await this.db
+          .prepare(
+            `SELECT COUNT(*) as count FROM users 
+             WHERE user_id LIKE ? OR first_name LIKE ? OR username LIKE ?`,
+          )
+          .bind(search, search, search)
+          .first<{ count: number }>();
+        total = countRes?.count || 0;
 
-      const results = await this.db
-        .prepare(
-          `SELECT * FROM users 
-           WHERE user_id LIKE ? OR first_name LIKE ? OR username LIKE ? 
-           ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
-        )
-        .bind(search, search, search, limit, offset)
-        .all<UserRecord>();
-      users = results.results;
-    } else {
-      const countRes = await this.db.prepare("SELECT COUNT(*) as count FROM users").first<{ count: number }>();
-      total = countRes?.count || 0;
+        const results = await this.db
+          .prepare(
+            `SELECT * FROM users 
+             WHERE user_id LIKE ? OR first_name LIKE ? OR username LIKE ? 
+             ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+          )
+          .bind(search, search, search, limit, offset)
+          .all<UserRecord>();
+        users = results.results;
+      } else {
+        const countRes = await this.db.prepare("SELECT COUNT(*) as count FROM users").first<{ count: number }>();
+        total = countRes?.count || 0;
 
-      const results = await this.db
-        .prepare("SELECT * FROM users ORDER BY updated_at DESC LIMIT ? OFFSET ?")
-        .bind(limit, offset)
-        .all<UserRecord>();
-      users = results.results;
+        const results = await this.db
+          .prepare("SELECT * FROM users ORDER BY updated_at DESC LIMIT ? OFFSET ?")
+          .bind(limit, offset)
+          .all<UserRecord>();
+        users = results.results;
+      }
+    } catch (err) {
+      console.error("Failed to list users:", err);
     }
 
     return { users, total };
   }
 
   async getAllUserIds(): Promise<number[]> {
-    const res = await this.db.prepare("SELECT user_id FROM users WHERE is_banned = 0").all<{ user_id: number }>();
-    return res.results.map((r) => r.user_id);
+    if (!this.db) return [];
+    await this.ensureInitialized();
+    try {
+      const res = await this.db.prepare("SELECT user_id FROM users WHERE is_banned = 0").all<{ user_id: number }>();
+      return res.results.map((r) => r.user_id);
+    } catch {
+      return [];
+    }
   }
 
   // Forum Status
   async getForumStatus(threadId: number): Promise<ForumStatusRecord | null> {
-    return await this.db
-      .prepare("SELECT * FROM forum_status WHERE message_thread_id = ?")
-      .bind(threadId)
-      .first<ForumStatusRecord>();
+    if (!this.db) return null;
+    await this.ensureInitialized();
+    try {
+      return await this.db
+        .prepare("SELECT * FROM forum_status WHERE message_thread_id = ?")
+        .bind(threadId)
+        .first<ForumStatusRecord>();
+    } catch {
+      return null;
+    }
   }
 
   async setForumStatus(chatId: number, threadId: number, status: "opened" | "closed"): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT INTO forum_status (chat_id, message_thread_id, status, updated_at)
-         VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)
-         ON CONFLICT(message_thread_id) DO UPDATE SET
-           status = excluded.status,
-           updated_at = CURRENT_TIMESTAMP`,
-      )
-      .bind(chatId, threadId, status)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO forum_status (chat_id, message_thread_id, status, updated_at)
+           VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)
+           ON CONFLICT(message_thread_id) DO UPDATE SET
+             status = excluded.status,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(chatId, threadId, status)
+        .run();
+    } catch (err) {
+      console.error("Failed to set forum status:", err);
+    }
   }
 
   async listForumTopics(): Promise<ForumStatusRecord[]> {
-    const res = await this.db
-      .prepare("SELECT * FROM forum_status ORDER BY updated_at DESC LIMIT 50")
-      .all<ForumStatusRecord>();
-    return res.results;
+    if (!this.db) return [];
+    await this.ensureInitialized();
+    try {
+      const res = await this.db
+        .prepare("SELECT * FROM forum_status ORDER BY updated_at DESC LIMIT 50")
+        .all<ForumStatusRecord>();
+      return res.results;
+    } catch {
+      return [];
+    }
   }
 
   // Message Map
   async addMessageMap(userMsgId: number, groupMsgId: number, userId: number): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT INTO message_map (user_chat_message_id, group_chat_message_id, user_id)
-         VALUES (?, ?, ?)`,
-      )
-      .bind(userMsgId, groupMsgId, userId)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO message_map (user_chat_message_id, group_chat_message_id, user_id)
+           VALUES (?, ?, ?)`,
+        )
+        .bind(userMsgId, groupMsgId, userId)
+        .run();
+    } catch (err) {
+      console.error("Failed to add message map:", err);
+    }
   }
 
   async getMapByUserMessageId(userMsgId: number): Promise<MessageMapRecord | null> {
-    return await this.db
-      .prepare("SELECT * FROM message_map WHERE user_chat_message_id = ?")
-      .bind(userMsgId)
-      .first<MessageMapRecord>();
+    if (!this.db) return null;
+    await this.ensureInitialized();
+    try {
+      return await this.db
+        .prepare("SELECT * FROM message_map WHERE user_chat_message_id = ?")
+        .bind(userMsgId)
+        .first<MessageMapRecord>();
+    } catch {
+      return null;
+    }
   }
 
   async getMapByGroupMessageId(groupMsgId: number): Promise<MessageMapRecord | null> {
-    return await this.db
-      .prepare("SELECT * FROM message_map WHERE group_chat_message_id = ?")
-      .bind(groupMsgId)
-      .first<MessageMapRecord>();
+    if (!this.db) return null;
+    await this.ensureInitialized();
+    try {
+      return await this.db
+        .prepare("SELECT * FROM message_map WHERE group_chat_message_id = ?")
+        .bind(groupMsgId)
+        .first<MessageMapRecord>();
+    } catch {
+      return null;
+    }
   }
 
   async getAllMessagesByUser(userId: number): Promise<MessageMapRecord[]> {
-    const res = await this.db
-      .prepare("SELECT * FROM message_map WHERE user_id = ?")
-      .bind(userId)
-      .all<MessageMapRecord>();
-    return res.results;
+    if (!this.db) return [];
+    await this.ensureInitialized();
+    try {
+      const res = await this.db
+        .prepare("SELECT * FROM message_map WHERE user_id = ?")
+        .bind(userId)
+        .all<MessageMapRecord>();
+      return res.results;
+    } catch {
+      return [];
+    }
   }
 
   async listRecentMessageMaps(limit: number = 50): Promise<MessageMapRecord[]> {
-    const res = await this.db
-      .prepare("SELECT * FROM message_map ORDER BY id DESC LIMIT ?")
-      .bind(limit)
-      .all<MessageMapRecord>();
-    return res.results;
+    if (!this.db) return [];
+    await this.ensureInitialized();
+    try {
+      const res = await this.db
+        .prepare("SELECT * FROM message_map ORDER BY id DESC LIMIT ?")
+        .bind(limit)
+        .all<MessageMapRecord>();
+      return res.results;
+    } catch {
+      return [];
+    }
   }
 
   // Settings
   async getSettings(env: Env): Promise<BotSettings> {
-    const rows = await this.db.prepare("SELECT key, value FROM bot_settings").all<{ key: string; value: string }>();
-    const map = new Map<string, string>();
-    for (const row of rows.results) {
-      map.set(row.key, row.value);
-    }
-
-    return {
-      WELCOME_MESSAGE: map.get("WELCOME_MESSAGE") ?? env.WELCOME_MESSAGE ?? "Hello! Thanks for reaching out.",
-      DISABLE_CAPTCHA: map.get("DISABLE_CAPTCHA") ?? env.DISABLE_CAPTCHA ?? "FALSE",
-      MESSAGE_INTERVAL: map.get("MESSAGE_INTERVAL") ?? env.MESSAGE_INTERVAL ?? "5",
-      DELETE_TOPIC_AS_FOREVER_BAN: map.get("DELETE_TOPIC_AS_FOREVER_BAN") ?? env.DELETE_TOPIC_AS_FOREVER_BAN ?? "FALSE",
-      DELETE_USER_MESSAGE_ON_CLEAR_CMD:
-        map.get("DELETE_USER_MESSAGE_ON_CLEAR_CMD") ?? env.DELETE_USER_MESSAGE_ON_CLEAR_CMD ?? "TRUE",
+    const fallbackSettings: BotSettings = {
+      TGC_WELCOME_MESSAGE:
+        env.TGC_WELCOME_MESSAGE ||
+        "Hello! Thanks for contacting us. We will reach out as soon as possible.",
+      TGC_DISABLE_CAPTCHA: parseInt((env.TGC_DISABLE_CAPTCHA || "0") as string) || 0,
+      TGC_MESSAGE_INTERVAL: parseInt((env.TGC_MESSAGE_INTERVAL || "5") as string) || 5,
+      TGC_DELETE_TOPIC_AS_FOREVER_BAN:
+        parseInt((env.TGC_DELETE_TOPIC_AS_FOREVER_BAN || "0") as string) || 0,
+      TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD:
+        parseInt((env.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD || "1") as string) || 1,
     };
+
+    if (!this.db) return fallbackSettings;
+    await this.ensureInitialized();
+
+    try {
+      const rows = await this.db.prepare("SELECT key, value FROM bot_settings").all<{ key: string; value: string }>();
+      const map = new Map<string, string>();
+      for (const row of rows.results) {
+        map.set(row.key, row.value);
+      }
+
+      return {
+        TGC_WELCOME_MESSAGE:
+          map.get("TGC_WELCOME_MESSAGE") || fallbackSettings.TGC_WELCOME_MESSAGE,
+        TGC_DISABLE_CAPTCHA:
+          parseInt((map.get("TGC_DISABLE_CAPTCHA") || env.TGC_DISABLE_CAPTCHA) as string) || 0,
+        TGC_MESSAGE_INTERVAL:
+          parseInt((map.get("TGC_MESSAGE_INTERVAL") || env.TGC_MESSAGE_INTERVAL) as string) || 5,
+        TGC_DELETE_TOPIC_AS_FOREVER_BAN:
+          parseInt((map.get("TGC_DELETE_TOPIC_AS_FOREVER_BAN") || env.TGC_DELETE_TOPIC_AS_FOREVER_BAN) as string) || 0,
+        TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD:
+          parseInt(
+            (map.get("TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD") || env.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD) as string,
+          ) || 1,
+      };
+    } catch {
+      return fallbackSettings;
+    }
   }
 
   async updateSetting(key: string, value: string): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT INTO bot_settings (key, value, updated_at)
-         VALUES (?1, ?2, CURRENT_TIMESTAMP)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
-      )
-      .bind(key, value)
-      .run();
+    if (!this.db) return;
+    await this.ensureInitialized();
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO bot_settings (key, value, updated_at)
+           VALUES (?1, ?2, CURRENT_TIMESTAMP)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
+        )
+        .bind(key, value)
+        .run();
+    } catch (err) {
+      console.error("Failed to update setting:", err);
+    }
   }
 
   // Stats
@@ -228,20 +460,36 @@ export class Database {
     closedTopics: number;
     totalMessagesMapped: number;
   }> {
-    const [users, banned, open, closed, msgs] = await Promise.all([
-      this.db.prepare("SELECT COUNT(*) as c FROM users").first<{ c: number }>(),
-      this.db.prepare("SELECT COUNT(*) as c FROM users WHERE is_banned = 1").first<{ c: number }>(),
-      this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'opened'").first<{ c: number }>(),
-      this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'closed'").first<{ c: number }>(),
-      this.db.prepare("SELECT COUNT(*) as c FROM message_map").first<{ c: number }>(),
-    ]);
-
-    return {
-      totalUsers: users?.c || 0,
-      bannedUsers: banned?.c || 0,
-      openTopics: open?.c || 0,
-      closedTopics: closed?.c || 0,
-      totalMessagesMapped: msgs?.c || 0,
+    const emptyStats = {
+      totalUsers: 0,
+      bannedUsers: 0,
+      openTopics: 0,
+      closedTopics: 0,
+      totalMessagesMapped: 0,
     };
+
+    if (!this.db) return emptyStats;
+    await this.ensureInitialized();
+
+    try {
+      const [users, banned, open, closed, msgs] = await Promise.all([
+        this.db.prepare("SELECT COUNT(*) as c FROM users").first<{ c: number }>().catch(() => ({ c: 0 })),
+        this.db.prepare("SELECT COUNT(*) as c FROM users WHERE is_banned = 1").first<{ c: number }>().catch(() => ({ c: 0 })),
+        this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'opened'").first<{ c: number }>().catch(() => ({ c: 0 })),
+        this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'closed'").first<{ c: number }>().catch(() => ({ c: 0 })),
+        this.db.prepare("SELECT COUNT(*) as c FROM message_map").first<{ c: number }>().catch(() => ({ c: 0 })),
+      ]);
+
+      return {
+        totalUsers: users?.c || 0,
+        bannedUsers: banned?.c || 0,
+        openTopics: open?.c || 0,
+        closedTopics: closed?.c || 0,
+        totalMessagesMapped: msgs?.c || 0,
+      };
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+      return emptyStats;
+    }
   }
 }

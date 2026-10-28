@@ -21,6 +21,30 @@ export interface StatsResponse {
   totalMessagesMapped: number;
 }
 
+export interface WebhookInfo {
+  url: string;
+  hasCustomCertificate?: boolean;
+  pendingUpdateCount?: number;
+  lastErrorDate?: number;
+  lastErrorMessage?: string;
+}
+
+export interface AdminGroupCheck {
+  checked: boolean;
+  groupId: number | string;
+  title?: string;
+  type?: string;
+  isSupergroup: boolean;
+  isForum: boolean;
+  botInGroup: boolean;
+  botIsAdmin: boolean;
+  canManageTopics: boolean;
+  canDeleteMessages: boolean;
+  status: "ok" | "warning" | "error";
+  issues: string[];
+  error?: string;
+}
+
 export interface BotInfoResponse {
   bot: {
     id: number;
@@ -31,6 +55,48 @@ export interface BotInfoResponse {
   adminGroupId: string;
   adminGroupTitle: string;
   adminGroupError: string | null;
+  adminGroupCheck?: AdminGroupCheck | null;
+  webhookInfo?: WebhookInfo | null;
+}
+
+export interface EnvVarStatus {
+  isSet: boolean;
+  value?: string;
+  preview?: string;
+  count?: number;
+  fallback?: string | null;
+}
+
+export interface ConfigStatusResponse {
+  env: {
+    TGC_BOT_TOKEN: EnvVarStatus;
+    TGC_ADMIN_GROUP_ID: EnvVarStatus;
+    TGC_ADMIN_USER_IDS: EnvVarStatus;
+    TGC_USERNAME: EnvVarStatus;
+    TGC_PASSWORD: EnvVarStatus;
+    TGC_SECRET: EnvVarStatus;
+    TGC_WEBHOOK_SECRET: EnvVarStatus;
+  };
+  botInfo?: {
+    id: number;
+    username: string;
+    firstName: string;
+  } | null;
+  adminGroupCheck?: AdminGroupCheck | null;
+  webhookInfo?: WebhookInfo | null;
+  botError?: string | null;
+}
+
+export interface TestConfigResponse {
+  success: boolean;
+  results: {
+    botVerified: boolean;
+    bot?: { id: number; username: string; firstName: string };
+    adminGroup?: AdminGroupCheck;
+    adminUsers?: { checked: boolean; attempted: number; delivered: number; details: string[]; error?: string };
+    webhook?: WebhookInfo | null;
+    summary: string;
+  };
 }
 
 export interface TopicItem {
@@ -50,11 +116,11 @@ export interface MessageMapItem {
 }
 
 export interface BotSettings {
-  WELCOME_MESSAGE: string;
-  DISABLE_CAPTCHA: string;
-  MESSAGE_INTERVAL: string;
-  DELETE_TOPIC_AS_FOREVER_BAN: string;
-  DELETE_USER_MESSAGE_ON_CLEAR_CMD: string;
+  TGC_WELCOME_MESSAGE: string;
+  TGC_DISABLE_CAPTCHA: number;
+  TGC_MESSAGE_INTERVAL: string;
+  TGC_DELETE_TOPIC_AS_FOREVER_BAN: number;
+  TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD: number;
 }
 
 class ApiClient {
@@ -95,9 +161,13 @@ class ApiClient {
     });
 
     if (res.status === 401) {
+      const err = await res.json().catch(() => ({ error: "Unauthorized" }));
+      if (endpoint === "/api/auth/login") {
+        throw new Error(err.error || "Invalid username or password");
+      }
       this.logout();
       window.location.reload();
-      throw new Error("Unauthorized: Session expired");
+      throw new Error(err.error || "Unauthorized: Session expired");
     }
 
     if (!res.ok) {
@@ -123,6 +193,32 @@ class ApiClient {
 
   async getBotInfo(): Promise<BotInfoResponse> {
     return this.request<BotInfoResponse>("/api/admin/bot-info");
+  }
+
+  async configureWebhook(origin: string = window.location.origin): Promise<{
+    success: boolean;
+    message: string;
+    webhookUrl: string;
+    info?: any;
+  }> {
+    return this.request("/api/admin/webhook/configure", {
+      method: "POST",
+      body: JSON.stringify({ origin }),
+    });
+  }
+
+  async getWebhookInfo(): Promise<{ success: boolean; info: any }> {
+    return this.request("/api/admin/webhook/info");
+  }
+
+  async getConfigStatus(): Promise<ConfigStatusResponse> {
+    return this.request<ConfigStatusResponse>("/api/admin/config/status");
+  }
+
+  async testTelegramConfig(): Promise<TestConfigResponse> {
+    return this.request<TestConfigResponse>("/api/admin/bot/test", {
+      method: "POST",
+    });
   }
 
   async getUsers(

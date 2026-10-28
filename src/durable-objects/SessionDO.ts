@@ -115,9 +115,9 @@ export class SessionDO implements DurableObject {
       message_id: number;
     } | null;
 
-    if (captcha && this.env.BOT_TOKEN) {
+    if (captcha && this.env.TGC_BOT_TOKEN) {
       try {
-        await fetch(`https://api.telegram.org/bot${this.env.BOT_TOKEN}/deleteMessage`, {
+        await fetch(`https://api.telegram.org/bot${this.env.TGC_BOT_TOKEN}/deleteMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

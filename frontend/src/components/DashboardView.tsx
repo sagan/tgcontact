@@ -19,15 +19,18 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
-import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import { api, StatsResponse, BotInfoResponse } from "../api";
 
 interface DashboardViewProps {
   onNavigate: (tab: string) => void;
-  onOpenWebhookModal: () => void;
+  onOpenConfigureModal: () => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpenWebhookModal }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({
+  onNavigate,
+  onOpenConfigureModal,
+}) => {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [botInfo, setBotInfo] = useState<BotInfoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +40,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     try {
       setLoading(true);
       setError(null);
-      const [s, b] = await Promise.all([api.getStats(), api.getBotInfo()]);
+      const [s, b] = await Promise.all([
+        api.getStats().catch((e) => {
+          console.warn("Failed to fetch stats:", e);
+          return {
+            totalUsers: 0,
+            bannedUsers: 0,
+            openTopics: 0,
+            closedTopics: 0,
+            totalMessagesMapped: 0,
+          };
+        }),
+        api.getBotInfo().catch((e) => {
+          console.warn("Failed to fetch bot info:", e);
+          return null;
+        }),
+      ]);
       setStats(s);
       setBotInfo(b);
     } catch (err: any) {
@@ -70,8 +88,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             Cloudflare Workers Edge Status & Real-time Bot Telemetry
           </Typography>
         </div>
-        <Button variant="outlined" color="secondary" startIcon={<LinkOutlinedIcon />} onClick={onOpenWebhookModal}>
-          Webhook Setup Guide
+        <Button
+          variant="outlined"
+          color="primary"
+          startIcon={<TuneOutlinedIcon />}
+          onClick={onOpenConfigureModal}
+        >
+          Configure
         </Button>
       </Box>
 
@@ -233,24 +256,104 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
                   <Divider />
 
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography color="text.secondary">Admin Supergroup:</Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {botInfo.adminGroupError ? (
-                        <Chip icon={<ErrorOutlineIcon />} label="Admin Group Unreachable" color="error" />
-                      ) : (
-                        <Chip icon={<CheckCircleOutlineIcon />} label={botInfo.adminGroupTitle} color="success" />
-                      )}
-                      <Typography variant="caption" color="text.secondary">
-                        (ID: {botInfo.adminGroupId})
-                      </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography color="text.secondary">Admin Supergroup:</Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        {botInfo.adminGroupError ? (
+                          <Chip icon={<ErrorOutlineIcon />} label="Admin Group Unreachable" color="error" />
+                        ) : (
+                          <Chip icon={<CheckCircleOutlineIcon />} label={botInfo.adminGroupTitle} color="success" />
+                        )}
+                        <Typography variant="caption" color="text.secondary">
+                          (ID: {botInfo.adminGroupId})
+                        </Typography>
+                      </Box>
                     </Box>
+
+                    {botInfo.adminGroupCheck && (
+                      <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <Chip
+                          icon={botInfo.adminGroupCheck.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
+                          label={botInfo.adminGroupCheck.isSupergroup ? "Supergroup" : `Type: ${botInfo.adminGroupCheck.type || "group"}`}
+                          color={botInfo.adminGroupCheck.isSupergroup ? "success" : "error"}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          icon={botInfo.adminGroupCheck.isForum ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
+                          label={botInfo.adminGroupCheck.isForum ? "Forum Topics Enabled" : "Topics Disabled"}
+                          color={botInfo.adminGroupCheck.isForum ? "success" : "error"}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          icon={botInfo.adminGroupCheck.botIsAdmin ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
+                          label={botInfo.adminGroupCheck.botIsAdmin ? "Bot: Administrator" : "Bot: Not Admin"}
+                          color={botInfo.adminGroupCheck.botIsAdmin ? "success" : "error"}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                    )}
                   </Box>
 
                   {botInfo.adminGroupError && (
                     <Alert severity="warning">
                       {botInfo.adminGroupError}. Please ensure the bot is added to the supergroup as an Admin with Topic
                       Management permissions.
+                    </Alert>
+                  )}
+
+                  <Divider />
+
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography color="text.secondary">Telegram Webhook:</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {botInfo.webhookInfo?.url ? (
+                        <Chip
+                          icon={<CheckCircleOutlineIcon />}
+                          label={botInfo.webhookInfo.url}
+                          color="success"
+                          variant="outlined"
+                          size="small"
+                        />
+                      ) : (
+                        <Chip
+                          icon={<ErrorOutlineIcon />}
+                          label="Webhook Not Configured"
+                          color="warning"
+                          variant="outlined"
+                          size="small"
+                        />
+                      )}
+                    </Box>
+                  </Box>
+
+                  {botInfo.webhookInfo?.lastErrorMessage && (
+                    <Alert
+                      severity="warning"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          onClick={onOpenConfigureModal}
+                        >
+                          Configure
+                        </Button>
+                      }
+                    >
+                      <Typography variant="body2" fontWeight={600}>
+                        Telegram Webhook Notice:
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontFamily: "monospace", display: "block" }}>
+                        {botInfo.webhookInfo.lastErrorMessage}
+                      </Typography>
+                      {botInfo.webhookInfo.lastErrorDate && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Recorded: {new Date(botInfo.webhookInfo.lastErrorDate * 1000).toLocaleString()}
+                        </Typography>
+                      )}
                     </Alert>
                   )}
 

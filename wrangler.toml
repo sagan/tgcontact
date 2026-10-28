@@ -12,6 +12,9 @@ run_worker_first = ["/api/*", "/health", "/webhook"]
 [[d1_databases]]
 binding = "DB"
 database_name = "tgcontact"
+# Leave database id unconfigured so CF "automatic resource provisioning" feature
+# automatically creates and binds one the first time deploying this project.
+# It's able to change the binded database later from Cloudflare Worker dashboard.
 #database_id = "00000000-0000-0000-0000-000000000000"
 
 [durable_objects]
@@ -25,15 +28,16 @@ tag = "v1"
 new_sqlite_classes = ["MediaGroupDO", "SessionDO"]
 
 [vars]
-#APP_NAME = "tgcontact"
-#BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
-#ADMIN_GROUP_ID = "-1000000000000"
-#ADMIN_USER_IDS = "123456789"
-#WELCOME_MESSAGE = "Hello! Thanks for contacting customer support. An agent will be with you shortly."
-#DELETE_TOPIC_AS_FOREVER_BAN = "FALSE"
-#DELETE_USER_MESSAGE_ON_CLEAR_CMD = "TRUE"
-#DISABLE_CAPTCHA = "FALSE"
-#MESSAGE_INTERVAL = "5"
-#ADMIN_WEB_USERNAME = "admin"
-#ADMIN_WEB_PASSWORD = "admin_password_change_me"
-#JWT_SECRET = "super_secret_jwt_key_please_change_in_production"
+#TGC_NAME = "tgcontact"
+#TGC_BOT_TOKEN = "" # tg bot token
+#TGC_ADMIN_GROUP_ID = "0" # admin group id
+#TGC_ADMIN_USER_IDS = "" # admin user ids, comma separated
+#TGC_WELCOME_MESSAGE = "Hello! Thanks for contacting us. We will reach out as soon as possible."
+#TGC_DELETE_TOPIC_AS_FOREVER_BAN = "0"
+#TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD = "1"
+#TGC_DISABLE_CAPTCHA = "0"
+#TGC_MESSAGE_INTERVAL = "5" # interval between messages
+#TGC_USERNAME = "" # admin username
+#TGC_PASSWORD = "" # admin password
+#TGC_SECRET = "" # jwt secret. fallbacks to password
+#TGC_WEBHOOK_SECRET = "" # Telegram bot secret token. fallbacks to sha256(password)

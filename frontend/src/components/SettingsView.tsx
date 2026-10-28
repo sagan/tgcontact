@@ -17,11 +17,11 @@ import { api, BotSettings } from "../api";
 
 export const SettingsView: React.FC = () => {
   const [settings, setSettings] = useState<BotSettings>({
-    WELCOME_MESSAGE: "",
-    DISABLE_CAPTCHA: "FALSE",
-    MESSAGE_INTERVAL: "5",
-    DELETE_TOPIC_AS_FOREVER_BAN: "FALSE",
-    DELETE_USER_MESSAGE_ON_CLEAR_CMD: "TRUE",
+    TGC_WELCOME_MESSAGE: "",
+    TGC_DISABLE_CAPTCHA: 0,
+    TGC_MESSAGE_INTERVAL: "5",
+    TGC_DELETE_TOPIC_AS_FOREVER_BAN: 0,
+    TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD: 1,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -108,8 +108,8 @@ export const SettingsView: React.FC = () => {
               fullWidth
               multiline
               rows={4}
-              value={settings.WELCOME_MESSAGE}
-              onChange={(e) => setSettings({ ...settings, WELCOME_MESSAGE: e.target.value })}
+              value={settings.TGC_WELCOME_MESSAGE}
+              onChange={(e) => setSettings({ ...settings, TGC_WELCOME_MESSAGE: e.target.value })}
               sx={{ mb: 3 }}
             />
 
@@ -126,11 +126,11 @@ export const SettingsView: React.FC = () => {
               <FormControlLabel
                 control={
                   <Switch
-                    checked={settings.DISABLE_CAPTCHA === "TRUE"}
+                    checked={settings.TGC_DISABLE_CAPTCHA === 1}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
-                        DISABLE_CAPTCHA: e.target.checked ? "TRUE" : "FALSE",
+                        TGC_DISABLE_CAPTCHA: e.target.checked ? 1 : 0,
                       })
                     }
                   />
@@ -146,8 +146,8 @@ export const SettingsView: React.FC = () => {
               label="Message Interval Throttling (Seconds)"
               type="number"
               fullWidth
-              value={settings.MESSAGE_INTERVAL}
-              onChange={(e) => setSettings({ ...settings, MESSAGE_INTERVAL: e.target.value })}
+              value={settings.TGC_MESSAGE_INTERVAL}
+              onChange={(e) => setSettings({ ...settings, TGC_MESSAGE_INTERVAL: e.target.value })}
               helperText="Minimum wait time between consecutive messages from the same customer (0 to disable)."
               sx={{ mb: 3 }}
             />
@@ -165,11 +165,11 @@ export const SettingsView: React.FC = () => {
               <FormControlLabel
                 control={
                   <Switch
-                    checked={settings.DELETE_TOPIC_AS_FOREVER_BAN === "TRUE"}
+                    checked={settings.TGC_DELETE_TOPIC_AS_FOREVER_BAN === 1}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
-                        DELETE_TOPIC_AS_FOREVER_BAN: e.target.checked ? "TRUE" : "FALSE",
+                        TGC_DELETE_TOPIC_AS_FOREVER_BAN: e.target.checked ? 1 : 0,
                       })
                     }
                   />
@@ -186,11 +186,11 @@ export const SettingsView: React.FC = () => {
               <FormControlLabel
                 control={
                   <Switch
-                    checked={settings.DELETE_USER_MESSAGE_ON_CLEAR_CMD === "TRUE"}
+                    checked={settings.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD === 1}
                     onChange={(e) =>
                       setSettings({
                         ...settings,
-                        DELETE_USER_MESSAGE_ON_CLEAR_CMD: e.target.checked ? "TRUE" : "FALSE",
+                        TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD: e.target.checked ? 1 : 0,
                       })
                     }
                   />

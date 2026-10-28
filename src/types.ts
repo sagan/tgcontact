@@ -10,19 +10,19 @@ export interface Env {
   ASSETS: Fetcher;
 
   // Environment variables
-  APP_NAME?: string;
-  BOT_TOKEN: string;
-  ADMIN_GROUP_ID?: string;
-  ADMIN_USER_IDS?: string;
-  WELCOME_MESSAGE?: string;
-  DELETE_TOPIC_AS_FOREVER_BAN?: string;
-  DELETE_USER_MESSAGE_ON_CLEAR_CMD?: string;
-  DISABLE_CAPTCHA?: string;
-  MESSAGE_INTERVAL?: string;
-  ADMIN_WEB_USERNAME?: string;
-  ADMIN_WEB_PASSWORD?: string;
-  JWT_SECRET?: string;
-  WEBHOOK_SECRET?: string;
+  TGC_NAME?: string;
+  TGC_BOT_TOKEN: string;
+  TGC_ADMIN_GROUP_ID?: string;
+  TGC_ADMIN_USER_IDS?: string;
+  TGC_WELCOME_MESSAGE?: string;
+  TGC_DELETE_TOPIC_AS_FOREVER_BAN?: string;
+  TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD?: string;
+  TGC_DISABLE_CAPTCHA?: string;
+  TGC_MESSAGE_INTERVAL?: string;
+  TGC_USERNAME?: string;
+  TGC_PASSWORD?: string;
+  TGC_SECRET?: string;
+  TGC_WEBHOOK_SECRET?: string;
 }
 
 export interface UserRecord {
@@ -57,9 +57,24 @@ export interface MessageMapRecord {
 }
 
 export interface BotSettings {
-  WELCOME_MESSAGE: string;
-  DISABLE_CAPTCHA: string;
-  MESSAGE_INTERVAL: string;
-  DELETE_TOPIC_AS_FOREVER_BAN: string;
-  DELETE_USER_MESSAGE_ON_CLEAR_CMD: string;
+  /**
+   * Welcome message.
+   */
+  TGC_WELCOME_MESSAGE: string;
+  /**
+   * Disable captcha. Defaults to 0 (false).
+   */
+  TGC_DISABLE_CAPTCHA: number;
+  /**
+   * Telegram Message interval in seconds. Defaults to 5.
+   */
+  TGC_MESSAGE_INTERVAL: number;
+  /**
+   * Delete topic as forever ban. Defaults to 0 (false).
+   */
+  TGC_DELETE_TOPIC_AS_FOREVER_BAN: number;
+  /**
+   * Delete user message on clear command. Defaults to 1 (true).
+   */
+  TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD: number;
 }

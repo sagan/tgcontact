@@ -23,7 +23,7 @@ import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 
 import { api } from "./api";
 import { LoginView } from "./components/LoginView";
@@ -33,14 +33,15 @@ import { TopicsView } from "./components/TopicsView";
 import { MessagesView } from "./components/MessagesView";
 import { BroadcastView } from "./components/BroadcastView";
 import { SettingsView } from "./components/SettingsView";
-import { WebhookSetupDialog } from "./components/WebhookSetupDialog";
+import { ConfigureDialog } from "./components/ConfigureDialog";
 
 const DRAWER_WIDTH = 260;
 
 export const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(api.isLoggedIn());
   const [currentTab, setCurrentTab] = useState<string>("dashboard");
-  const [webhookModalOpen, setWebhookModalOpen] = useState(false);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   if (!isLoggedIn) {
     return <LoginView onLoginSuccess={() => setIsLoggedIn(true)} />;
@@ -90,11 +91,11 @@ export const App: React.FC = () => {
             <Button
               size="small"
               variant="outlined"
-              color="secondary"
-              startIcon={<LinkOutlinedIcon />}
-              onClick={() => setWebhookModalOpen(true)}
+              color="primary"
+              startIcon={<TuneOutlinedIcon />}
+              onClick={() => setConfigDialogOpen(true)}
             >
-              Webhook URL
+              Configure
             </Button>
             <IconButton onClick={handleLogout} color="error" title="Sign Out">
               <LogoutOutlinedIcon fontSize="small" />
@@ -134,7 +135,7 @@ export const App: React.FC = () => {
           </Box>
           <div>
             <Typography variant="subtitle1" fontWeight={700}>
-              TG Interactive
+              Tgcontact
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Serverless Control
@@ -184,8 +185,9 @@ export const App: React.FC = () => {
         <Container maxWidth="xl" disableGutters>
           {currentTab === "dashboard" && (
             <DashboardView
+              key={refreshKey}
               onNavigate={(tab) => setCurrentTab(tab)}
-              onOpenWebhookModal={() => setWebhookModalOpen(true)}
+              onOpenConfigureModal={() => setConfigDialogOpen(true)}
             />
           )}
           {currentTab === "users" && <UsersView />}
@@ -196,8 +198,12 @@ export const App: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Webhook Setup Modal */}
-      <WebhookSetupDialog open={webhookModalOpen} onClose={() => setWebhookModalOpen(false)} />
+      {/* Configuration & Diagnostics Modal */}
+      <ConfigureDialog
+        open={configDialogOpen}
+        onClose={() => setConfigDialogOpen(false)}
+        onWebhookUpdated={() => setRefreshKey((k) => k + 1)}
+      />
     </Box>
   );
 };

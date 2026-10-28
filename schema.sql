@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS bot_settings (
 
 -- Default settings matching the original python project
 INSERT OR IGNORE INTO bot_settings (key, value) VALUES
-    ('WELCOME_MESSAGE', 'Hello! Thanks for reaching out. An agent will respond to you shortly.'),
-    ('DISABLE_CAPTCHA', 'FALSE'),
-    ('MESSAGE_INTERVAL', '5'),
-    ('DELETE_TOPIC_AS_FOREVER_BAN', 'FALSE'),
-    ('DELETE_USER_MESSAGE_ON_CLEAR_CMD', 'TRUE');
+    ('TGC_WELCOME_MESSAGE', 'Hello! Thanks for reaching out. An agent will respond to you shortly.'),
+    ('TGC_DISABLE_CAPTCHA', 'FALSE'),
+    ('TGC_MESSAGE_INTERVAL', '5'),
+    ('TGC_DELETE_TOPIC_AS_FOREVER_BAN', 'FALSE'),
+    ('TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD', 'TRUE');

@@ -91,16 +91,16 @@ Open [wrangler.toml](file:///root/projects/tgcontact/tg-interactive-worker/wrang
 
 ```toml
 [vars]
-BOT_TOKEN = "123456789:ABCDefghIJKLmnOPQRstuvWXyz"
-ADMIN_GROUP_ID = "-1002234110823"  # Your Supergroup ID (starts with -100)
-ADMIN_USER_IDS = "1281631753"       # Comma-separated Admin Telegram User IDs
-WELCOME_MESSAGE = "Hello! Thanks for reaching out. How can I help you today?"
-ADMIN_WEB_USERNAME = "admin"
-ADMIN_WEB_PASSWORD = "your_secure_password"
-JWT_SECRET = "generate_a_random_secret_string"
+TGC_BOT_TOKEN = "123456789:ABCDefghIJKLmnOPQRstuvWXyz"
+TGC_ADMIN_GROUP_ID = "-1002234110823"  # Your Supergroup ID (starts with -100)
+TGC_ADMIN_USER_IDS = "1281631753"       # Comma-separated Admin Telegram User IDs
+TGC_WELCOME_MESSAGE = "Hello! Thanks for reaching out. How can I help you today?"
+TGC_USERNAME = "admin"
+TGC_PASSWORD = "your_secure_password"
+TGC_SECRET = "generate_a_random_secret_string"
 ```
 
-_(Tip: For production secrets, you can also use `npx wrangler secret put BOT_TOKEN`)_
+_(Tip: For production secrets, you can also use `npx wrangler secret put TGC_BOT_TOKEN`)_
 
 ### Step 5: Deploy to Cloudflare Workers
 
@@ -115,10 +115,10 @@ Once deployed, Cloudflare will output your worker URL (e.g., `https://tg-interac
 Register your Cloudflare Worker URL with Telegram:
 
 ```bash
-curl -F "url=https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/webhook" https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook
+curl -F "url=https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/webhook" https://api.telegram.org/bot<YOUR_TGC_BOT_TOKEN>/setWebhook
 ```
 
-You can also open the Web UI at `https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/` and use the built-in **Webhook Setup Guide**.
+You can also simply log into the Web UI at `https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/` and click the **Configure** button to automatically set up the Telegram bot webhook with your worker URL and security secret.
 
 ---
 
@@ -127,8 +127,8 @@ You can also open the Web UI at `https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/` a
 Navigate to your deployed worker URL (or `http://localhost:8787` during local dev):
 
 - **URL**: `https://<YOUR_WORKER_SUBDOMAIN>.workers.dev/`
-- **Default Username**: `admin` (or what you configured in `ADMIN_WEB_USERNAME`)
-- **Default Password**: `admin_password_change_me` (or what you configured in `ADMIN_WEB_PASSWORD`)
+- **Default Username**: `admin` (or what you configured in `TGC_USERNAME`)
+- **Default Password**: `admin_password_change_me` (or what you configured in `TGC_PASSWORD`)
 
 ---
 

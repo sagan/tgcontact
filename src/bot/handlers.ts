@@ -1,20 +1,28 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
+import type { UserFromGetMe } from "grammy/types";
 import { Env, UserRecord } from "../types";
 import { Database } from "../db";
 import { getRandomCaptcha } from "./captcha";
 
-export function createBot(env: Env, requestOrigin: string) {
-  const bot = new Bot(env.BOT_TOKEN);
+export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGetMe) {
+  const bot = new Bot(env.TGC_BOT_TOKEN, botInfo ? { botInfo } : undefined);
+  bot.catch((err) => {
+    console.error("Error in bot middleware:", err);
+  });
   const db = new Database(env.DB);
 
-  const adminGroupChatId = Number(env.ADMIN_GROUP_ID) || 0;
-  const adminUserIds = (env.ADMIN_USER_IDS || "")
+  const adminGroupChatId = Number(env.TGC_ADMIN_GROUP_ID) || 0;
+  const adminUserIds = (env.TGC_ADMIN_USER_IDS || "")
     .split(",")
     .map((id) => Number(id.trim()))
-    .filter((id) => !isNaN(id));
+    .filter((id) => !!id);
+
+  const escapeHtml = (text?: string | null) => {
+    return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
 
   const getMentionHtml = (userId: number, name: string) => {
-    const escaped = (name || "User").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const escaped = escapeHtml(name || "User");
     return `<a href="tg://user?id=${userId}">${escaped}</a>`;
   };
 
@@ -30,11 +38,31 @@ export function createBot(env: Env, requestOrigin: string) {
     return env.MEDIA_GROUP_DO.get(id);
   };
 
-  // Command: /start (in private chat)
+  // Command: /start
   bot.command("start", async (ctx) => {
-    if (ctx.chat.type !== "private") return;
     const user = ctx.from;
     if (!user) return;
+
+    if (ctx.chat.type !== "private") {
+      const isGroupAdmin = adminUserIds.includes(user.id);
+      const groupTitle = "title" in ctx.chat ? ctx.chat.title : "Group";
+      const botUsername = ctx.me?.username || env.TGC_NAME || "bot";
+      if (isGroupAdmin) {
+        await ctx.reply(
+          `👋 Hello Admin <b>${escapeHtml(user.first_name)}</b> (<code>${user.id}</code>)!\n\n` +
+            `Bot is operating normally in <b>${escapeHtml(groupTitle)}</b>.\n` +
+            `Type /info to view diagnostic IDs or use /clear and /broadcast in support topics.`,
+          { parse_mode: "HTML" },
+        );
+      } else {
+        await ctx.reply(
+          `👋 Hello <b>${escapeHtml(user.first_name)}</b>!\n` +
+            `Please message @${botUsername} directly in private chat for customer support inquiries.`,
+          { parse_mode: "HTML" },
+        );
+      }
+      return;
+    }
 
     await db.upsertUser({
       user_id: user.id,
@@ -51,25 +79,68 @@ export function createBot(env: Env, requestOrigin: string) {
         const groupChat = await ctx.api.getChat(adminGroupChatId);
         const groupTitle = "title" in groupChat ? groupChat.title : "Admin Group";
         await ctx.reply(
-          `Hello Admin <b>${user.first_name}</b> (<code>${user.id}</code>)!\n\n` +
-            `Welcome to <b>${env.APP_NAME || "Interactive Bot"}</b>.\n` +
-            `Configuration verified successfully! Support group: <b>${groupTitle}</b>`,
+          `👋 Hello Admin <b>${escapeHtml(user.first_name)}</b> (<code>${user.id}</code>)!\n\n` +
+            `Welcome to <b>${escapeHtml(env.TGC_NAME || "Tgcontact")}</b> Administration.\n` +
+            `• <b>Status:</b> Authorized Administrator\n` +
+            `• <b>Support Group:</b> ${escapeHtml(groupTitle)} (<code>${adminGroupChatId}</code>)\n\n` +
+            `<b>Available Commands:</b>\n` +
+            `• /info - View your Telegram User ID & current Chat/Group ID\n` +
+            `• /broadcast - Broadcast announcement to users (in admin group)\n` +
+            `• /clear - Delete forum topic & clear chat history (in topic)\n\n` +
+            `Customer messages sent to this bot will be relayed directly to the support group.`,
           { parse_mode: "HTML" },
         );
       } catch (err: any) {
+        const botUsername = ctx.me?.username || "bot";
         await ctx.reply(
-          `⚠️ <b>Admin group configuration error:</b>\n\n` +
-            `Please ensure bot @${ctx.me.username} has been added to group <code>${adminGroupChatId}</code> as Administrator with Topic Management & Message permissions.\n` +
-            `Error: <code>${err?.message || err}</code>`,
+          `⚠️ <b>Admin group configuration warning:</b>\n\n` +
+            `Hello Admin <b>${escapeHtml(user.first_name)}</b>! Please ensure bot @${botUsername} has been added to group <code>${adminGroupChatId}</code> as Administrator with Topic Management & Message permissions.\n\n` +
+            `Error: <code>${escapeHtml(err?.message || String(err))}</code>`,
           { parse_mode: "HTML" },
         );
       }
     } else {
       const mention = getMentionHtml(user.id, user.first_name);
-      await ctx.reply(`${mention}:\n\n${settings.WELCOME_MESSAGE}`, {
+      await ctx.reply(`${mention}:\n\n${settings.TGC_WELCOME_MESSAGE}`, {
         parse_mode: "HTML",
       });
     }
+  });
+
+  // Command: /info (in private chat or group /info@bot)
+  bot.command("info", async (ctx) => {
+    const user = ctx.from;
+    if (!user) return;
+
+    const isAdmin = adminUserIds.includes(user.id);
+    const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
+
+    let message = `📋 <b>Telegram Information</b>\n\n`;
+    message += `👤 <b>User Info:</b>\n`;
+    message += `• <b>User ID:</b> <code>${user.id}</code>\n`;
+    message += `• <b>First Name:</b> ${escapeHtml(user.first_name || "N/A")}\n`;
+    if (user.last_name) message += `• <b>Last Name:</b> ${escapeHtml(user.last_name)}\n`;
+    if (user.username) message += `• <b>Username:</b> @${escapeHtml(user.username)}\n`;
+    message += `• <b>Role:</b> ${isAdmin ? "👑 Administrator" : "Standard User"}\n`;
+
+    if (isGroup) {
+      const groupTitle = "title" in ctx.chat ? ctx.chat.title : "Group";
+      const isConfiguredAdminGroup = ctx.chat.id === adminGroupChatId;
+      message += `\n👥 <b>Group Info:</b>\n`;
+      message += `• <b>Group Title:</b> ${escapeHtml(groupTitle)}\n`;
+      message += `• <b>Group ID:</b> <code>${ctx.chat.id}</code>\n`;
+      message += `• <b>Chat Type:</b> ${ctx.chat.type}\n`;
+      if (adminGroupChatId) {
+        message += `• <b>Configured Support Group:</b> ${isConfiguredAdminGroup ? "✅ Yes" : "❌ No"}\n`;
+      }
+      if (ctx.message?.message_thread_id) {
+        message += `• <b>Topic Thread ID:</b> <code>${ctx.message.message_thread_id}</code>\n`;
+      }
+    } else {
+      message += `\n💬 <b>Chat Type:</b> Private Chat\n`;
+    }
+
+    await ctx.reply(message, { parse_mode: "HTML" });
   });
 
   // Callback query: Captcha answers (vcode_<answer>_<userId>)
@@ -155,7 +226,7 @@ export function createBot(env: Env, requestOrigin: string) {
     }
 
     // 2. If configured, delete all user messages in user's chat
-    if (settings.DELETE_USER_MESSAGE_ON_CLEAR_CMD === "TRUE" && targetUser) {
+    if (settings.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD === 1 && targetUser) {
       try {
         const mappedMsgs = await db.getAllMessagesByUser(targetUser.user_id);
         const userMsgIds = mappedMsgs.map((m) => m.user_chat_message_id);
@@ -232,7 +303,7 @@ export function createBot(env: Env, requestOrigin: string) {
     const settings = await db.getSettings(env);
 
     // 1. Captcha Check
-    if (settings.DISABLE_CAPTCHA !== "TRUE" && !userRecord?.is_verified) {
+    if (settings.TGC_DISABLE_CAPTCHA !== 1 && !userRecord?.is_verified) {
       const sessionDO = getSessionDO(user.id);
       const statusRes = await sessionDO.fetch(new Request("https://do/status"));
       const status = (await statusRes.json()) as { isHuman: boolean; isMuted: boolean };
@@ -267,14 +338,13 @@ export function createBot(env: Env, requestOrigin: string) {
     }
 
     // 2. Rate Limit Check
-    const intervalSec = parseInt(settings.MESSAGE_INTERVAL || "5", 10);
-    if (intervalSec > 0) {
+    if (settings.TGC_MESSAGE_INTERVAL > 0) {
       const sessionDO = getSessionDO(user.id);
       const rateLimitRes = await sessionDO.fetch(
         new Request("https://do/check-rate-limit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ intervalSec }),
+          body: JSON.stringify({ intervalSec: settings.TGC_MESSAGE_INTERVAL }),
         }),
       );
       const rateLimit = (await rateLimitRes.json()) as { allowed: boolean };
@@ -388,7 +458,7 @@ export function createBot(env: Env, requestOrigin: string) {
     } catch (err: any) {
       console.error("Error in forwarding u2a:", err);
       if (err?.description?.includes("message thread not found") || err?.description?.includes("TOPIC_DELETED")) {
-        if (settings.DELETE_TOPIC_AS_FOREVER_BAN === "TRUE") {
+        if (settings.TGC_DELETE_TOPIC_AS_FOREVER_BAN === 1) {
           await ctx.reply("Failed to send: your support conversation has been terminated by an administrator.");
         } else {
           await db.updateUserThreadId(user.id, 0);

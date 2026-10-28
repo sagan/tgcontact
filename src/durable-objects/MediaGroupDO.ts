@@ -48,7 +48,7 @@ export class MediaGroupDO implements DurableObject {
     try {
       const first = items[0];
       const messageIds = items.map((i) => i.message_id);
-      const botToken = this.env.BOT_TOKEN;
+      const botToken = this.env.TGC_BOT_TOKEN;
 
       const payload: Record<string, unknown> = {
         chat_id: first.target_id,

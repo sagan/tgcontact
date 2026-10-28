@@ -77,7 +77,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <SmartToyOutlinedIcon sx={{ fontSize: 32, color: "#fff" }} />
             </Box>
             <Typography variant="h5" align="center" gutterBottom>
-              Telegram Bot Admin
+              Tgcontact Admin
             </Typography>
             <Typography variant="body2" color="text.secondary" align="center">
               Serverless Control Portal (Cloudflare Workers + D1)
