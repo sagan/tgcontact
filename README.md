@@ -1,4 +1,4 @@
-# Telegram Interactive Customer Support Bot (Cloudflare Serverless Edition)
+# Tgcontact (Cloudflare Worker app)
 
 A high-performance, serverless rewrite of [Telegram-interactive-bot](https://github.com/MiHaKun/Telegram-interactive-bot) designed to run **100% on Cloudflare's Free Tier** (Workers + D1 + Durable Objects + Static Assets).
 

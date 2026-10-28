@@ -51,13 +51,13 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
         await ctx.reply(
           `👋 Hello Admin <b>${escapeHtml(user.first_name)}</b> (<code>${user.id}</code>)!\n\n` +
             `Bot is operating normally in <b>${escapeHtml(groupTitle)}</b>.\n` +
-            `Type /info to view diagnostic IDs or use /clear and /broadcast in support topics.`,
+            `Type /info to view diagnostic IDs or use /clear and /broadcast in topics.`,
           { parse_mode: "HTML" },
         );
       } else {
         await ctx.reply(
           `👋 Hello <b>${escapeHtml(user.first_name)}</b>!\n` +
-            `Please message @${botUsername} directly in private chat for customer support inquiries.`,
+            `Please message @${botUsername} directly in private chat for inquiries.`,
           { parse_mode: "HTML" },
         );
       }
@@ -82,12 +82,12 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
           `👋 Hello Admin <b>${escapeHtml(user.first_name)}</b> (<code>${user.id}</code>)!\n\n` +
             `Welcome to <b>${escapeHtml(env.TGC_NAME || "Tgcontact")}</b> Administration.\n` +
             `• <b>Status:</b> Authorized Administrator\n` +
-            `• <b>Support Group:</b> ${escapeHtml(groupTitle)} (<code>${adminGroupChatId}</code>)\n\n` +
+            `• <b>Admin Group:</b> ${escapeHtml(groupTitle)} (<code>${adminGroupChatId}</code>)\n\n` +
             `<b>Available Commands:</b>\n` +
             `• /info - View your Telegram User ID & current Chat/Group ID\n` +
             `• /broadcast - Broadcast announcement to users (in admin group)\n` +
             `• /clear - Delete forum topic & clear chat history (in topic)\n\n` +
-            `Customer messages sent to this bot will be relayed directly to the support group.`,
+            `User messages sent to this bot will be relayed directly to the admin group.`,
           { parse_mode: "HTML" },
         );
       } catch (err: any) {
@@ -131,7 +131,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
       message += `• <b>Group ID:</b> <code>${ctx.chat.id}</code>\n`;
       message += `• <b>Chat Type:</b> ${ctx.chat.type}\n`;
       if (adminGroupChatId) {
-        message += `• <b>Configured Support Group:</b> ${isConfiguredAdminGroup ? "✅ Yes" : "❌ No"}\n`;
+        message += `• <b>Configured Admin Group:</b> ${isConfiguredAdminGroup ? "✅ Yes" : "❌ No"}\n`;
       }
       if (ctx.message?.message_thread_id) {
         message += `• <b>Topic Thread ID:</b> <code>${ctx.message.message_thread_id}</code>\n`;
@@ -296,7 +296,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
 
     const userRecord = await db.getUser(user.id);
     if (userRecord?.is_banned) {
-      await ctx.reply("You have been banned from contacting support.");
+      await ctx.reply("You have been banned from contacting admin.");
       return;
     }
 
@@ -318,7 +318,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
       if (!status.isHuman) {
         const captcha = getRandomCaptcha(requestOrigin, user.id);
         const promptMsg = await ctx.replyWithPhoto(captcha.imageUrl, {
-          caption: `Please solve the captcha to contact support:\nSelect the matching text from the image below:`,
+          caption: `Please solve the captcha to contact admin:\nSelect the matching text from the image below:`,
           reply_markup: captcha.keyboard,
         });
 
@@ -361,9 +361,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
     if (threadId > 0) {
       const forumStatus = await db.getForumStatus(threadId);
       if (forumStatus?.status === "closed") {
-        await ctx.reply(
-          "Customer support has closed this conversation. Please contact through other channels to reopen.",
-        );
+        await ctx.reply("Admin has closed this conversation. Please contact through other channels to reopen.");
         return;
       }
     }
@@ -413,7 +411,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
         }
       } catch (err: any) {
         console.error("Failed to create forum topic:", err);
-        await ctx.reply(`Failed to deliver message to support: ${err?.message || err}`);
+        await ctx.reply(`Failed to deliver message to admin: ${err?.message || err}`);
         return;
       }
     }
@@ -459,7 +457,7 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
       console.error("Error in forwarding u2a:", err);
       if (err?.description?.includes("message thread not found") || err?.description?.includes("TOPIC_DELETED")) {
         if (settings.TGC_DELETE_TOPIC_AS_FOREVER_BAN === 1) {
-          await ctx.reply("Failed to send: your support conversation has been terminated by an administrator.");
+          await ctx.reply("Failed to send: your conversation has been terminated by an administrator.");
         } else {
           await db.updateUserThreadId(user.id, 0);
           await ctx.reply(
@@ -490,16 +488,13 @@ export function createBot(env: Env, requestOrigin: string, botInfo?: UserFromGet
 
     if (ctx.message.forum_topic_closed) {
       await db.setForumStatus(adminGroupChatId, threadId, "closed");
-      await ctx.api.sendMessage(targetUser.user_id, "This conversation has been closed by customer support.");
+      await ctx.api.sendMessage(targetUser.user_id, "This conversation has been closed by admin.");
       return;
     }
 
     if (ctx.message.forum_topic_reopened) {
       await db.setForumStatus(adminGroupChatId, threadId, "opened");
-      await ctx.api.sendMessage(
-        targetUser.user_id,
-        "Customer support has reopened your conversation. You can now reply.",
-      );
+      await ctx.api.sendMessage(targetUser.user_id, "Admin has reopened your conversation. You can now reply.");
       return;
     }
 

@@ -27,10 +27,7 @@ interface DashboardViewProps {
   onOpenConfigureModal: () => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({
-  onNavigate,
-  onOpenConfigureModal,
-}) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onOpenConfigureModal }) => {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [botInfo, setBotInfo] = useState<BotInfoResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,12 +85,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Cloudflare Workers Edge Status & Real-time Bot Telemetry
           </Typography>
         </div>
-        <Button
-          variant="outlined"
-          color="primary"
-          startIcon={<TuneOutlinedIcon />}
-          onClick={onOpenConfigureModal}
-        >
+        <Button variant="outlined" color="primary" startIcon={<TuneOutlinedIcon />} onClick={onOpenConfigureModal}>
           Configure
         </Button>
       </Box>
@@ -227,13 +219,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </Grid>
       </Grid>
 
-      {/* Bot & Support Group Health Status */}
+      {/* Bot & Admin Group Health Status */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
           <Card>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" gutterBottom>
-                Telegram Bot & Support Group Health
+                Telegram Bot & Admin Group Health
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Connected Bot Credentials & Supergroup Topic Routing
@@ -274,8 +266,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     {botInfo.adminGroupCheck && (
                       <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         <Chip
-                          icon={botInfo.adminGroupCheck.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
-                          label={botInfo.adminGroupCheck.isSupergroup ? "Supergroup" : `Type: ${botInfo.adminGroupCheck.type || "group"}`}
+                          icon={
+                            botInfo.adminGroupCheck.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />
+                          }
+                          label={
+                            botInfo.adminGroupCheck.isSupergroup
+                              ? "Supergroup"
+                              : `Type: ${botInfo.adminGroupCheck.type || "group"}`
+                          }
                           color={botInfo.adminGroupCheck.isSupergroup ? "success" : "error"}
                           size="small"
                           variant="outlined"
@@ -334,11 +332,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <Alert
                       severity="warning"
                       action={
-                        <Button
-                          color="inherit"
-                          size="small"
-                          onClick={onOpenConfigureModal}
-                        >
+                        <Button color="inherit" size="small" onClick={onOpenConfigureModal}>
                           Configure
                         </Button>
                       }

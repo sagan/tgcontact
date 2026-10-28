@@ -254,11 +254,11 @@ export async function checkAdminGroup(bot: Bot, groupId: number, botId: number):
 
     if (!check.isSupergroup) {
       check.issues.push(
-        `Group type is "${chat.type}". Tgcontact requires a "supergroup". In Telegram group settings, turn on 'Topics' (or 'Forum') to convert it to a supergroup.`
+        `Group type is "${chat.type}". Tgcontact requires a "supergroup". In Telegram group settings, turn on 'Topics' (or 'Forum') to convert it to a supergroup.`,
       );
     } else if (!check.isForum) {
       check.issues.push(
-        "Group is a supergroup but 'Topics' (Forum) is disabled. In group settings, enable 'Topics' / 'Forum'."
+        "Group is a supergroup but 'Topics' (Forum) is disabled. In group settings, enable 'Topics' / 'Forum'.",
       );
     }
 
@@ -284,19 +284,17 @@ export async function checkAdminGroup(bot: Bot, groupId: number, botId: number):
       } else {
         check.botIsAdmin = false;
         check.issues.push(
-          `Bot is in the group as a regular "${member.status}", not as an Administrator. Please promote the bot to Administrator.`
+          `Bot is in the group as a regular "${member.status}", not as an Administrator. Please promote the bot to Administrator.`,
         );
       }
     } catch (memberErr: any) {
       check.issues.push(
-        `Could not verify bot membership: ${memberErr?.message || "Bot is not in group"}. Please invite the bot to the group as Administrator.`
+        `Could not verify bot membership: ${memberErr?.message || "Bot is not in group"}. Please invite the bot to the group as Administrator.`,
       );
     }
   } catch (chatErr: any) {
     check.error = chatErr?.message || "Failed to reach group";
-    check.issues.push(
-      `Cannot access group (${groupId}): ${check.error}. Please ensure the bot is added to the group.`
-    );
+    check.issues.push(`Cannot access group (${groupId}): ${check.error}. Please ensure the bot is added to the group.`);
   }
 
   if (check.error || !check.botInGroup) {
@@ -500,7 +498,11 @@ adminApp.get("/admin/config/status", async (c) => {
     env: {
       TGC_BOT_TOKEN: {
         isSet: hasBotToken,
-        preview: hasBotToken ? (c.env.TGC_BOT_TOKEN.length > 10 ? `${c.env.TGC_BOT_TOKEN.slice(0, 6)}...` : "Configured") : "Not Set",
+        preview: hasBotToken
+          ? c.env.TGC_BOT_TOKEN.length > 10
+            ? `${c.env.TGC_BOT_TOKEN.slice(0, 6)}...`
+            : "Configured"
+          : "Not Set",
       },
       TGC_ADMIN_GROUP_ID: {
         isSet: !!adminGroupId && adminGroupId !== "0",
@@ -604,7 +606,10 @@ adminApp.post("/admin/bot/test", async (c) => {
         attempted: adminUserIds.length,
         delivered,
         details,
-        error: delivered === 0 ? "Could not deliver test message to admin user(s). Ensure admin user has messaged /start to the bot." : undefined,
+        error:
+          delivered === 0
+            ? "Could not deliver test message to admin user(s). Ensure admin user has messaged /start to the bot."
+            : undefined,
       };
     } else {
       results.adminUsers = {
@@ -612,7 +617,8 @@ adminApp.post("/admin/bot/test", async (c) => {
         attempted: 0,
         delivered: 0,
         details: [],
-        error: "TGC_ADMIN_USER_IDS is not configured. Add your Telegram user ID in wrangler.toml or environment variables.",
+        error:
+          "TGC_ADMIN_USER_IDS is not configured. Add your Telegram user ID in wrangler.toml or environment variables.",
       };
     }
 
@@ -622,7 +628,7 @@ adminApp.post("/admin/bot/test", async (c) => {
     if (groupOk && usersDelivered) {
       results.summary = `All checks passed! Supergroup topics verified, bot is Administrator, and direct test message delivered to ${results.adminUsers.delivered} admin user(s).`;
     } else if (!groupOk && usersDelivered) {
-      results.summary = `Test message delivered to admin user(s), BUT support group needs attention: ${adminGroupCheck.issues[0] || adminGroupCheck.error}`;
+      results.summary = `Test message delivered to admin user(s), BUT admin group needs attention: ${adminGroupCheck.issues[0] || adminGroupCheck.error}`;
     } else if (groupOk && !usersDelivered) {
       results.summary = `Supergroup verified, but direct test message could not be sent to admin users. Ensure admin accounts have messaged /start to the bot.`;
     } else {
@@ -634,4 +640,3 @@ adminApp.post("/admin/bot/test", async (c) => {
     return c.json({ error: err?.message || "Failed to verify Telegram Bot" }, 500);
   }
 });
-

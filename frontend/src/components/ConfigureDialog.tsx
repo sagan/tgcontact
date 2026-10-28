@@ -276,10 +276,19 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                     border: "1px solid rgba(255, 255, 255, 0.08)",
                   }}
                 >
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 1.5,
+                      flexWrap: "wrap",
+                      gap: 1,
+                    }}
+                  >
                     <Box>
                       <Typography variant="subtitle2" fontWeight={600}>
-                        Admin Support Group Configuration Check
+                        Admin Group Configuration Check
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {config.adminGroupCheck.title || `Chat ID: ${config.adminGroupCheck.groupId}`}
@@ -288,7 +297,11 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                     <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap" }}>
                       <Chip
                         icon={config.adminGroupCheck.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
-                        label={config.adminGroupCheck.isSupergroup ? "Supergroup" : `Type: ${config.adminGroupCheck.type || "group"}`}
+                        label={
+                          config.adminGroupCheck.isSupergroup
+                            ? "Supergroup"
+                            : `Type: ${config.adminGroupCheck.type || "group"}`
+                        }
                         color={config.adminGroupCheck.isSupergroup ? "success" : "error"}
                         size="small"
                         variant="outlined"
@@ -308,7 +321,9 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                         variant="outlined"
                       />
                       <Chip
-                        icon={config.adminGroupCheck.canManageTopics ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
+                        icon={
+                          config.adminGroupCheck.canManageTopics ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />
+                        }
                         label={config.adminGroupCheck.canManageTopics ? "Manage Topics: Yes" : "Manage Topics: Missing"}
                         color={config.adminGroupCheck.canManageTopics ? "success" : "error"}
                         size="small"
@@ -320,7 +335,7 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                   {config.adminGroupCheck.issues && config.adminGroupCheck.issues.length > 0 ? (
                     <Alert severity="warning" sx={{ mt: 1 }}>
                       <Typography variant="body2" fontWeight={600} gutterBottom>
-                        Action needed for admin support group:
+                        Action needed for admin group:
                       </Typography>
                       {config.adminGroupCheck.issues.map((issue, idx) => (
                         <Typography key={idx} variant="caption" display="block">
@@ -330,7 +345,8 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                     </Alert>
                   ) : (
                     <Alert severity="success" sx={{ mt: 1 }}>
-                      All Support Group Requirements Met: Supergroup with Topics enabled and Bot is an Administrator with topic management permissions.
+                      All Admin Group Requirements Met: Supergroup with Topics enabled and Bot is an Administrator with
+                      topic management permissions.
                     </Alert>
                   )}
                 </Box>
@@ -345,7 +361,9 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                 2. Telegram Webhook Endpoint
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
-                Configure Telegram to push updates directly to this Cloudflare Worker endpoint with secret token validation. Setting the webhook also automatically registers bot commands (<code>/start</code>, <code>/info</code>, <code>/clear</code>, <code>/broadcast</code>) as Telegram menu buttons.
+                Configure Telegram to push updates directly to this Cloudflare Worker endpoint with secret token
+                validation. Setting the webhook also automatically registers bot commands (<code>/start</code>,{" "}
+                <code>/info</code>, <code>/clear</code>, <code>/broadcast</code>) as Telegram menu buttons.
               </Typography>
 
               {webhookSuccess && (
@@ -415,12 +433,7 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                   <Alert
                     severity="warning"
                     action={
-                      <Button
-                        color="inherit"
-                        size="small"
-                        onClick={handleSetWebhook}
-                        disabled={settingWebhook}
-                      >
+                      <Button color="inherit" size="small" onClick={handleSetWebhook} disabled={settingWebhook}>
                         Reset / Retry
                       </Button>
                     }
@@ -434,11 +447,14 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                       </Typography>
                       {config.webhookInfo.lastErrorDate && (
                         <Typography variant="caption" color="text.secondary" display="block">
-                          Last recorded by Telegram: {new Date(config.webhookInfo.lastErrorDate * 1000).toLocaleString()}
+                          Last recorded by Telegram:{" "}
+                          {new Date(config.webhookInfo.lastErrorDate * 1000).toLocaleString()}
                         </Typography>
                       )}
                       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                        Note: Telegram retains the last reported error in its diagnostics. If commands like <code>/info</code> are responding, live webhook delivery is operating normally. Click "Reset / Retry" to purge any old pending update retries on Telegram's side.
+                        Note: Telegram retains the last reported error in its diagnostics. If commands like{" "}
+                        <code>/info</code> are responding, live webhook delivery is operating normally. Click "Reset /
+                        Retry" to purge any old pending update retries on Telegram's side.
                       </Typography>
                     </Box>
                   </Alert>
@@ -456,7 +472,8 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                     3. Connection & Configuration Test
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Validate bot credentials, supergroup topic accessibility, and send a live test message to configured admin Telegram account(s).
+                    Validate bot credentials, supergroup topic accessibility, and send a live test message to configured
+                    admin Telegram account(s).
                   </Typography>
                 </div>
                 <Button
@@ -479,7 +496,9 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
               {testResult && (
                 <Paper variant="outlined" sx={{ p: 2, bgcolor: "background.paper" }}>
                   <Alert
-                    severity={testResult.adminUsers?.delivered && testResult.adminUsers.delivered > 0 ? "success" : "warning"}
+                    severity={
+                      testResult.adminUsers?.delivered && testResult.adminUsers.delivered > 0 ? "success" : "warning"
+                    }
                     sx={{ mb: 2 }}
                   >
                     {testResult.summary}
@@ -508,16 +527,22 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                           {testResult.adminGroup?.title
                             ? testResult.adminGroup.title
                             : testResult.adminGroup?.error
-                            ? `⚠️ ${testResult.adminGroup.error}`
-                            : "Not Checked"}
+                              ? `⚠️ ${testResult.adminGroup.error}`
+                              : "Not Checked"}
                         </Typography>
                       </Box>
 
                       {testResult.adminGroup && testResult.adminGroup.checked && (
                         <Box sx={{ display: "flex", gap: 0.8, flexWrap: "wrap", mt: 0.5 }}>
                           <Chip
-                            icon={testResult.adminGroup.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
-                            label={testResult.adminGroup.isSupergroup ? "Supergroup" : `Type: ${testResult.adminGroup.type || "group"}`}
+                            icon={
+                              testResult.adminGroup.isSupergroup ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />
+                            }
+                            label={
+                              testResult.adminGroup.isSupergroup
+                                ? "Supergroup"
+                                : `Type: ${testResult.adminGroup.type || "group"}`
+                            }
                             color={testResult.adminGroup.isSupergroup ? "success" : "error"}
                             size="small"
                             variant="outlined"
@@ -537,8 +562,12 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                             variant="outlined"
                           />
                           <Chip
-                            icon={testResult.adminGroup.canManageTopics ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />}
-                            label={testResult.adminGroup.canManageTopics ? "Manage Topics: Yes" : "Manage Topics: Missing"}
+                            icon={
+                              testResult.adminGroup.canManageTopics ? <CheckCircleOutlineIcon /> : <ErrorOutlineIcon />
+                            }
+                            label={
+                              testResult.adminGroup.canManageTopics ? "Manage Topics: Yes" : "Manage Topics: Missing"
+                            }
                             color={testResult.adminGroup.canManageTopics ? "success" : "error"}
                             size="small"
                             variant="outlined"
@@ -547,8 +576,22 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                       )}
 
                       {testResult.adminGroup?.issues && testResult.adminGroup.issues.length > 0 && (
-                        <Box sx={{ mt: 1, p: 1.5, bgcolor: "rgba(245, 158, 11, 0.1)", borderRadius: 1, border: "1px solid rgba(245, 158, 11, 0.2)" }}>
-                          <Typography variant="caption" fontWeight={600} color="warning.main" display="block" gutterBottom>
+                        <Box
+                          sx={{
+                            mt: 1,
+                            p: 1.5,
+                            bgcolor: "rgba(245, 158, 11, 0.1)",
+                            borderRadius: 1,
+                            border: "1px solid rgba(245, 158, 11, 0.2)",
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight={600}
+                            color="warning.main"
+                            display="block"
+                            gutterBottom
+                          >
                             ⚠️ Group Configuration Issues Detected:
                           </Typography>
                           {testResult.adminGroup.issues.map((issue, idx) => (
@@ -570,8 +613,8 @@ export const ConfigureDialog: React.FC<ConfigureDialogProps> = ({ open, onClose,
                         {testResult.adminUsers?.delivered && testResult.adminUsers.delivered > 0
                           ? `✅ Delivered (${testResult.adminUsers.delivered}/${testResult.adminUsers.attempted})`
                           : testResult.adminUsers?.error
-                          ? `⚠️ ${testResult.adminUsers.error}`
-                          : "Not Configured"}
+                            ? `⚠️ ${testResult.adminUsers.error}`
+                            : "Not Configured"}
                       </Typography>
                     </Box>
 
