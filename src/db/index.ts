@@ -1,95 +1,59 @@
 import { Env, UserRecord, ForumStatusRecord, MessageMapRecord, BotSettings } from "../types";
-
-export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL,
-    first_name TEXT,
-    last_name TEXT,
-    username TEXT,
-    is_premium INTEGER DEFAULT 0,
-    message_thread_id INTEGER DEFAULT 0,
-    is_banned INTEGER DEFAULT 0,
-    is_verified INTEGER DEFAULT 0,
-    last_message_at INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id);
-CREATE INDEX IF NOT EXISTS idx_users_thread_id ON users(message_thread_id);
-
-CREATE TABLE IF NOT EXISTS forum_status (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER NOT NULL,
-    message_thread_id INTEGER UNIQUE NOT NULL,
-    status TEXT DEFAULT 'opened',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_forum_thread_id ON forum_status(message_thread_id);
-
-CREATE TABLE IF NOT EXISTS message_map (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_chat_message_id INTEGER NOT NULL,
-    group_chat_message_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_msg_map_user_msg ON message_map(user_chat_message_id);
-CREATE INDEX IF NOT EXISTS idx_msg_map_group_msg ON message_map(group_chat_message_id);
-CREATE INDEX IF NOT EXISTS idx_msg_map_user_id ON message_map(user_id);
-
-CREATE TABLE IF NOT EXISTS broadcast_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender_admin_id INTEGER,
-    source_message_id INTEGER,
-    total_targets INTEGER DEFAULT 0,
-    success_count INTEGER DEFAULT 0,
-    fail_count INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'completed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS bot_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT OR IGNORE INTO bot_settings (key, value) VALUES
-    ('TGC_WELCOME_MESSAGE', 'Hello! Thanks for reaching out. An agent will respond to you shortly.'),
-    ('TGC_DISABLE_CAPTCHA', '0'),
-    ('TGC_MESSAGE_INTERVAL', '5'),
-    ('TGC_DELETE_TOPIC_AS_FOREVER_BAN', '0'),
-    ('TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD', '1');
-`;
+import { MIGRATIONS } from "./migrations";
 
 let schemaInitialized = false;
 
 export async function ensureSchema(db?: D1Database): Promise<void> {
   if (schemaInitialized || !db) return;
+
   try {
-    await db.exec(SCHEMA_SQL);
+    // Ensure standard D1 migrations tracking table exists
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS d1_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Fetch previously applied migrations
+    const appliedRows = await db
+      .prepare("SELECT name FROM d1_migrations")
+      .all<{ name: string }>()
+      .catch(() => ({ results: [] as { name: string }[] }));
+
+    const appliedSet = new Set((appliedRows.results || []).map((r) => r.name));
+
+    for (const migration of MIGRATIONS) {
+      if (!appliedSet.has(migration.name)) {
+        try {
+          await db.exec(migration.sql);
+        } catch (err) {
+          console.warn(`db.exec batch migration failed for ${migration.name}, executing statements individually:`, err);
+          const statements = migration.sql
+            .split(";")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          for (const stmt of statements) {
+            try {
+              await db.prepare(stmt).run();
+            } catch {
+              // Ignore statement duplicate error
+            }
+          }
+        }
+
+        await db
+          .prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)")
+          .bind(migration.name)
+          .run()
+          .catch(() => null);
+      }
+    }
+
     schemaInitialized = true;
   } catch (err) {
-    console.warn("db.exec batch schema init warning, retrying individual statements:", err);
-    try {
-      const statements = SCHEMA_SQL.split(";")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      for (const stmt of statements) {
-        try {
-          await db.prepare(stmt).run();
-        } catch {
-          // Ignore individual statement duplicate errors
-        }
-      }
-      schemaInitialized = true;
-    } catch (fallbackErr) {
-      console.error("Failed to auto-initialize D1 schema:", fallbackErr);
-    }
+    console.error("Failed to run D1 migrations:", err);
   }
 }
 
@@ -396,14 +360,11 @@ export class Database {
   async getSettings(env: Env): Promise<BotSettings> {
     const fallbackSettings: BotSettings = {
       TGC_WELCOME_MESSAGE:
-        env.TGC_WELCOME_MESSAGE ||
-        "Hello! Thanks for contacting us. We will reach out as soon as possible.",
+        env.TGC_WELCOME_MESSAGE || "Hello! Thanks for contacting us. We will reach out as soon as possible.",
       TGC_DISABLE_CAPTCHA: parseInt((env.TGC_DISABLE_CAPTCHA || "0") as string) || 0,
       TGC_MESSAGE_INTERVAL: parseInt((env.TGC_MESSAGE_INTERVAL || "5") as string) || 5,
-      TGC_DELETE_TOPIC_AS_FOREVER_BAN:
-        parseInt((env.TGC_DELETE_TOPIC_AS_FOREVER_BAN || "0") as string) || 0,
-      TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD:
-        parseInt((env.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD || "1") as string) || 1,
+      TGC_DELETE_TOPIC_AS_FOREVER_BAN: parseInt((env.TGC_DELETE_TOPIC_AS_FOREVER_BAN || "0") as string) || 0,
+      TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD: parseInt((env.TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD || "1") as string) || 1,
     };
 
     if (!this.db) return fallbackSettings;
@@ -417,12 +378,9 @@ export class Database {
       }
 
       return {
-        TGC_WELCOME_MESSAGE:
-          map.get("TGC_WELCOME_MESSAGE") || fallbackSettings.TGC_WELCOME_MESSAGE,
-        TGC_DISABLE_CAPTCHA:
-          parseInt((map.get("TGC_DISABLE_CAPTCHA") || env.TGC_DISABLE_CAPTCHA) as string) || 0,
-        TGC_MESSAGE_INTERVAL:
-          parseInt((map.get("TGC_MESSAGE_INTERVAL") || env.TGC_MESSAGE_INTERVAL) as string) || 5,
+        TGC_WELCOME_MESSAGE: map.get("TGC_WELCOME_MESSAGE") || fallbackSettings.TGC_WELCOME_MESSAGE,
+        TGC_DISABLE_CAPTCHA: parseInt((map.get("TGC_DISABLE_CAPTCHA") || env.TGC_DISABLE_CAPTCHA) as string) || 0,
+        TGC_MESSAGE_INTERVAL: parseInt((map.get("TGC_MESSAGE_INTERVAL") || env.TGC_MESSAGE_INTERVAL) as string) || 5,
         TGC_DELETE_TOPIC_AS_FOREVER_BAN:
           parseInt((map.get("TGC_DELETE_TOPIC_AS_FOREVER_BAN") || env.TGC_DELETE_TOPIC_AS_FOREVER_BAN) as string) || 0,
         TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD:
@@ -473,11 +431,26 @@ export class Database {
 
     try {
       const [users, banned, open, closed, msgs] = await Promise.all([
-        this.db.prepare("SELECT COUNT(*) as c FROM users").first<{ c: number }>().catch(() => ({ c: 0 })),
-        this.db.prepare("SELECT COUNT(*) as c FROM users WHERE is_banned = 1").first<{ c: number }>().catch(() => ({ c: 0 })),
-        this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'opened'").first<{ c: number }>().catch(() => ({ c: 0 })),
-        this.db.prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'closed'").first<{ c: number }>().catch(() => ({ c: 0 })),
-        this.db.prepare("SELECT COUNT(*) as c FROM message_map").first<{ c: number }>().catch(() => ({ c: 0 })),
+        this.db
+          .prepare("SELECT COUNT(*) as c FROM users")
+          .first<{ c: number }>()
+          .catch(() => ({ c: 0 })),
+        this.db
+          .prepare("SELECT COUNT(*) as c FROM users WHERE is_banned = 1")
+          .first<{ c: number }>()
+          .catch(() => ({ c: 0 })),
+        this.db
+          .prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'opened'")
+          .first<{ c: number }>()
+          .catch(() => ({ c: 0 })),
+        this.db
+          .prepare("SELECT COUNT(*) as c FROM forum_status WHERE status = 'closed'")
+          .first<{ c: number }>()
+          .catch(() => ({ c: 0 })),
+        this.db
+          .prepare("SELECT COUNT(*) as c FROM message_map")
+          .first<{ c: number }>()
+          .catch(() => ({ c: 0 })),
       ]);
 
       return {

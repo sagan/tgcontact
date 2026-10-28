@@ -1,4 +1,5 @@
--- Cloudflare D1 Database Schema for Telegram Interactive Bot
+-- Migration: 0001_init.sql
+-- Cloudflare D1 Database Initial Schema for Tgcontact
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,10 +58,9 @@ CREATE TABLE IF NOT EXISTS bot_settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Default settings matching the original python project
 INSERT OR IGNORE INTO bot_settings (key, value) VALUES
-    ('TGC_WELCOME_MESSAGE', 'Hello! Thanks for reaching out. An agent will respond to you shortly.'),
-    ('TGC_DISABLE_CAPTCHA', 'FALSE'),
+    ('TGC_WELCOME_MESSAGE', 'Hello! Thanks for reaching out. The admin will respond to you shortly.'),
+    ('TGC_DISABLE_CAPTCHA', '0'),
     ('TGC_MESSAGE_INTERVAL', '5'),
-    ('TGC_DELETE_TOPIC_AS_FOREVER_BAN', 'FALSE'),
-    ('TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD', 'TRUE');
+    ('TGC_DELETE_TOPIC_AS_FOREVER_BAN', '0'),
+    ('TGC_DELETE_USER_MESSAGE_ON_CLEAR_CMD', '1');

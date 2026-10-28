@@ -78,11 +78,13 @@ database_id = "<YOUR_D1_DATABASE_ID>"
 Initialize the tables in D1:
 
 ```bash
+# Note: The Worker also applies migrations automatically at runtime on first startup.
+# To manually apply migrations via CLI:
 # For local testing:
-npx wrangler d1 execute tg-bot-db --local --file=./schema.sql
+npm run db:migrate
 
 # For production deployment:
-npx wrangler d1 execute tg-bot-db --remote --file=./schema.sql
+npm run db:migrate:remote
 ```
 
 ### Step 4: Configure Environment Variables

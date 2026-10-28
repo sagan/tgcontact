@@ -8,8 +8,10 @@
     "deploy": "npm run build && wrangler deploy",
     "build:frontend": "npm --prefix frontend ci && npm --prefix frontend run build",
     "build": "npm run build:frontend",
-    "db:init": "wrangler d1 execute tgcontact --local --file=./schema.sql",
-    "db:init:remote": "wrangler d1 execute tgcontact --remote --file=./schema.sql"
+    "db:migrate": "wrangler d1 migrations apply tgcontact --local",
+    "db:migrate:remote": "wrangler d1 migrations apply tgcontact --remote",
+    "db:init": "npm run db:migrate",
+    "db:init:remote": "npm run db:migrate:remote"
   },
   "dependencies": {
     "grammy": "^1.35.0",
