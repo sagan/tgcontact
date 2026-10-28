@@ -22,7 +22,7 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["MediaGroupDO", "SessionDO"]
+new_sqlite_classes = ["MediaGroupDO", "SessionDO"]
 
 [vars]
 #APP_NAME = "tgcontact"
